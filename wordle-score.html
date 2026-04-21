@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wordle Score Calculator</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green:  #538d4e;
+      --yellow: #b59f3b;
+      --dark:   #121213;
+      --surface: #1a1a1b;
+      --surface2: #242424;
+      --border: rgba(255,255,255,0.1);
+      --text:   #ffffff;
+      --text-muted: rgba(255,255,255,0.5);
+      --text-dim: rgba(255,255,255,0.28);
+      --danger: #e74c3c;
+      --danger-bg: rgba(231,76,60,0.12);
+    }
+
+    html, body {
+      min-height: 100vh;
+      background: var(--dark);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 3rem 1rem 4rem;
+    }
+
+    /* ── header ── */
+    .header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+      animation: fadeDown 0.5s ease both;
+    }
+
+    .header-eyebrow {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--green);
+      margin-bottom: 10px;
+    }
+
+    .header-title {
+      font-family: 'Space Mono', monospace;
+      font-size: clamp(28px, 6vw, 42px);
+      font-weight: 700;
+      letter-spacing: -1px;
+      line-height: 1;
+      color: var(--text);
+    }
+
+    .header-title span { color: var(--green); }
+
+    .header-sub {
+      margin-top: 10px;
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    /* ── scoring legend ── */
+    .legend {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 2rem;
+      animation: fadeDown 0.5s 0.1s ease both;
+    }
+
+    .legend-pill {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 99px;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      background: var(--surface);
+    }
+
+    .legend-pill.g { border-color: rgba(83,141,78,0.4); color: var(--green); background: rgba(83,141,78,0.08); }
+    .legend-pill.y { border-color: rgba(181,159,59,0.4); color: var(--yellow); background: rgba(181,159,59,0.08); }
+
+    /* ── card ── */
+    .card {
+      width: 100%;
+      max-width: 480px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.75rem;
+      animation: fadeUp 0.5s 0.15s ease both;
+    }
+
+    .field-label {
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 120px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-family: 'Space Mono', monospace;
+      font-size: 15px;
+      line-height: 1.9;
+      color: var(--text);
+      resize: vertical;
+      transition: border-color 0.2s;
+    }
+
+    textarea:focus { outline: none; border-color: rgba(83,141,78,0.6); }
+    textarea::placeholder { color: var(--text-dim); }
+
+    .hint {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 6px;
+      margin-bottom: 1.25rem;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 14px;
+      background: var(--green);
+      color: #fff;
+      font-family: 'Space Mono', monospace;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+
+    .btn:hover { opacity: 0.88; }
+    .btn:active { transform: scale(0.98); }
+
+    /* ── error ── */
+    .error {
+      display: none;
+      margin-top: 1rem;
+      padding: 10px 14px;
+      background: var(--danger-bg);
+      border: 1px solid rgba(231,76,60,0.3);
+      border-radius: 8px;
+      font-size: 13px;
+      color: var(--danger);
+    }
+
+    /* ── result ── */
+    .result {
+      display: none;
+      margin-top: 1.5rem;
+      animation: fadeUp 0.35s ease both;
+    }
+
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 1.25rem 0;
+    }
+
+    /* tile grid */
+    .tile-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 5px;
+      margin-bottom: 1.25rem;
+    }
+
+    .tile {
+      aspect-ratio: 1;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      background: #3a3a3c;
+      border: 1px solid rgba(255,255,255,0.05);
+      transition: transform 0.2s;
+    }
+
+    .tile.green  { background: var(--green);  border-color: var(--green); }
+    .tile.yellow { background: var(--yellow); border-color: var(--yellow); }
+
+    /* stats row */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 1.25rem;
+    }
+
+    .stat {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 8px;
+      text-align: center;
+    }
+
+    .stat-val {
+      font-family: 'Space Mono', monospace;
+      font-size: 26px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .stat-val.gv { color: var(--green); }
+    .stat-val.yv { color: var(--yellow); }
+
+    .stat-lbl {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* score banner */
+    .score-banner {
+      border-radius: 12px;
+      padding: 1.5rem;
+      text-align: center;
+      border: 1px solid rgba(83,141,78,0.3);
+      background: rgba(83,141,78,0.07);
+    }
+
+    .score-banner.fail {
+      border-color: rgba(231,76,60,0.3);
+      background: rgba(231,76,60,0.07);
+    }
+
+    .score-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--text-dim);
+    }
+
+    .score-number {
+      font-family: 'Space Mono', monospace;
+      font-size: 64px;
+      font-weight: 700;
+      line-height: 1;
+      color: var(--green);
+      margin: 6px 0 4px;
+    }
+
+    .score-number.fail-num { color: var(--danger); }
+
+    .score-game {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* breakdown */
+    .breakdown {
+      margin-top: 1rem;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+    }
+
+    .breakdown-title {
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-dim);
+      margin-bottom: 10px;
+    }
+
+    .row-score {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 0;
+      font-size: 13px;
+      color: var(--text-muted);
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .row-score:last-child { border-bottom: none; }
+
+    .row-pts {
+      font-family: 'Space Mono', monospace;
+      font-weight: 700;
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    .row-pts.win { color: var(--green); }
+
+    /* footer */
+    .footer {
+      margin-top: 2.5rem;
+      font-size: 12px;
+      color: var(--text-dim);
+      text-align: center;
+      animation: fadeUp 0.5s 0.3s ease both;
+    }
+
+    /* animations */
+    @keyframes fadeUp   { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes fadeDown { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
+
+    /* mobile */
+    @media (max-width: 500px) {
+      body { padding: 2rem 1rem 3rem; }
+      .score-number { font-size: 52px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="header-eyebrow">score tracker</div>
+    <div class="header-title">Wordle Warriors</div>
+    <div class="header-sub">Paste your result, get your scoreboard!</div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-pill g">🟩 green = 2 pts</div>
+    <div class="legend-pill y">🟨 yellow = 1 pt</div>
+    <div class="legend-pill">row 1 solve = 120 pts</div>
+    <div class="legend-pill">−20 per extra row</div>
+  </div>
+
+  <div class="card">
+    <div class="field-label">Your Wordle result</div>
+    <textarea id="wordleInput" placeholder="Wordle 1,234 3/6&#10;&#10;⬛🟨⬛⬛🟩&#10;⬛⬛🟩⬛🟩&#10;🟩🟩🟩🟩🟩"></textarea>
+    <div class="hint">paste directly from the Wordle share button</div>
+    <button class="btn" onclick="calculate()">Calculate Score →</button>
+    <div class="error" id="errorBox"></div>
+
+    <div class="result" id="resultBox">
+      <div class="divider"></div>
+      <div class="tile-grid" id="tileGrid"></div>
+      <div class="stats" id="statsGrid"></div>
+      <div id="scoreBanner"></div>
+      <div class="breakdown" id="breakdownBox"></div>
+    </div>
+  </div>
+
+  <div class="footer">Making Wordle by NYT competitive</div>
+
+  <script>
+    /**
+     * Wordle Score Calculator
+     * Scoring rules (translated 1:1 from Java):
+     *   - Before winning row: green = +2pts, yellow = +1pt
+     *   - Winning row reward: 20 * (7 - line), so row1=120, row2=100 ... row6=20
+     *   - No partial points on the winning row itself
+     *   - Failed game = 0 (no partial points counted)
+     */
+    function calculate() {
+      const raw = document.getElementById('wordleInput').value.trim();
+      const errorBox  = document.getElementById('errorBox');
+      const resultBox = document.getElementById('resultBox');
+      errorBox.style.display  = 'none';
+      resultBox.style.display = 'none';
+
+      if (!raw) { showError('Please paste your Wordle result first.'); return; }
+
+      const lines = raw.split('\n');
+      if (lines.length < 3) { showError('Invalid format — make sure you paste the full share text.'); return; }
+
+      const name = lines[0].substring(0, Math.min(12, lines[0].length));
+
+      // Emoji rows start after header line + blank line (index 2 onwards)
+      const emoLines = lines.slice(2).filter(l => l.trim() !== '');
+      if (emoLines.length === 0) { showError('No emoji rows found. Check the format.'); return; }
+
+      const GREEN  = '\uD83D\uDFE9';
+      const YELLOW = '\uD83D\uDFE8';
+
+      let score = 0;
+      let line  = 1;   // 1-indexed, matching Java's `line = 1`
+      let ans   = false;
+      const breakdown = [];
+      const allTiles  = [];
+
+      for (let li = 0; li < emoLines.length && line < 8; li++) {
+        const rowStr = emoLines[li];
+        let yellow = 0, green = 0;
+        const rowTiles = [];
+        let i = 0;
+
+        // Iterate over Unicode code points (handles surrogate pairs like Java's codePointAt)
+        while (i < rowStr.length) {
+          const cp   = rowStr.codePointAt(i);
+          const ch   = String.fromCodePoint(cp);
+          const step = cp > 0xFFFF ? 2 : 1;
+
+          if      (ch === GREEN)  { green++;  rowTiles.push('green');  }
+          else if (ch === YELLOW) { yellow++; rowTiles.push('yellow'); }
+          else                    {           rowTiles.push('black');  }
+
+          i += step;
+        }
+
+        // Pad row to 5 tiles if needed
+        while (rowTiles.length < 5) rowTiles.push('black');
+        allTiles.push(...rowTiles.slice(0, 5));
+
+        if (green === 5) {
+          // Winning row — add line reward, no partial points
+          ans = true;
+          const lineReward = 20 * (7 - line);
+          score += lineReward;
+          breakdown.push({
+            label: `row ${line} — solved!`,
+            detail: `line reward: 20 × (7−${line})`,
+            pts: lineReward,
+            win: true
+          });
+          break;
+        } else {
+          // Partial row — green=2, yellow=1
+          const rowPts = green * 2 + yellow;
+          score += rowPts;
+          breakdown.push({
+            label: `row ${line}`,
+            detail: `${green}×green (+${green*2}), ${yellow}×yellow (+${yellow})`,
+            pts: rowPts,
+            win: false
+          });
+        }
+
+        line++;
+      }
+
+      renderResult(allTiles, breakdown, score, name, ans, line);
+    }
+
+    function renderResult(tiles, breakdown, score, name, ans, solvedLine) {
+      // Tile grid
+      const grid = document.getElementById('tileGrid');
+      grid.innerHTML = '';
+      tiles.forEach((t, idx) => {
+        const d = document.createElement('div');
+        d.className = 'tile ' + t;
+        d.textContent = t === 'green' ? '🟩' : t === 'yellow' ? '🟨' : '⬛';
+        d.style.animationDelay = (idx * 0.04) + 's';
+        d.style.animation = 'fadeUp 0.3s ease both';
+        grid.appendChild(d);
+      });
+
+      // Stats
+      const greens  = tiles.filter(t => t === 'green').length;
+      const yellows = tiles.filter(t => t === 'yellow').length;
+      const blacks  = tiles.filter(t => t === 'black').length;
+
+      document.getElementById('statsGrid').innerHTML = `
+        <div class="stat">
+          <div class="stat-val gv">${greens}</div>
+          <div class="stat-lbl">greens</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val yv">${yellows}</div>
+          <div class="stat-lbl">yellows</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val">${blacks}</div>
+          <div class="stat-lbl">black</div>
+        </div>
+      `;
+
+      // Score banner
+      const banner = document.getElementById('scoreBanner');
+      if (ans) {
+        banner.innerHTML = `
+          <div class="score-banner">
+            <div class="score-label">final score</div>
+            <div class="score-number">${score}</div>
+            <div class="score-game">${name} &nbsp;·&nbsp; solved in ${solvedLine}</div>
+          </div>`;
+      } else {
+        banner.innerHTML = `
+          <div class="score-banner fail">
+            <div class="score-label">final score</div>
+            <div class="score-number fail-num">0</div>
+            <div class="score-game">${name} &nbsp;·&nbsp; not solved</div>
+          </div>`;
+      }
+
+      // Breakdown
+      const rows = breakdown.map(r => `
+        <div class="row-score">
+          <span>${r.label} <span style="font-size:11px;opacity:0.5;">${r.detail}</span></span>
+          <span class="row-pts ${r.win ? 'win' : ''}">+${r.pts}</span>
+        </div>`).join('');
+
+      document.getElementById('breakdownBox').innerHTML = `
+        <div class="breakdown-title">score breakdown</div>
+        ${rows}
+        <div class="row-score" style="margin-top:6px;border-top:1px solid rgba(255,255,255,0.08);padding-top:8px;">
+          <span style="font-weight:500;color:var(--text);">total</span>
+          <span class="row-pts ${ans ? 'win' : ''}" style="font-size:15px;">${ans ? score : 0}</span>
+        </div>`;
+
+      document.getElementById('resultBox').style.display = 'block';
+    }
+
+    function showError(msg) {
+      const e = document.getElementById('errorBox');
+      e.textContent = msg;
+      e.style.display = 'block';
+    }
+  </script>
+</body>
+</html>
